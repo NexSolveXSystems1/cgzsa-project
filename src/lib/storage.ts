@@ -106,9 +106,9 @@ export async function store(buf: Buffer, _originalName: string): Promise<Stored>
       ContentType: mimeType,
     }));
   } else {
-    const target = path.join(root(), key);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, finalBuffer);
+    const target = path.resolve(/*turbopackIgnore: true*/ root(), key);
+    await mkdir(/*turbopackIgnore: true*/ path.dirname(target), { recursive: true });
+    await writeFile(/*turbopackIgnore: true*/ target, finalBuffer);
   }
 
   return { storageKey: key, mimeType, bytes: finalBuffer.length, width, height };
@@ -119,8 +119,8 @@ export async function store(buf: Buffer, _originalName: string): Promise<Stored>
  * of the storage directory.
  */
 function resolveWithin(storageKey: string) {
-  const base = path.resolve(root());
-  const target = path.resolve(base, path.normalize(storageKey));
+  const base = path.resolve(/*turbopackIgnore: true*/ root());
+  const target = path.resolve(/*turbopackIgnore: true*/ base, path.normalize(storageKey));
   if (target !== base && !target.startsWith(base + path.sep)) throw new UploadError("Bad path");
   return target;
 }
@@ -141,7 +141,7 @@ export async function read(storageKey: string): Promise<Buffer> {
       throw new Error("File not found on S3");
     }
   } else {
-    return readFile(resolveWithin(storageKey));
+    return readFile(/*turbopackIgnore: true*/ resolveWithin(storageKey));
   }
 }
 
