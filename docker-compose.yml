@@ -1,0 +1,114 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cgzsa
+      # No default. A compose file that falls back to "change-me" is a compose
+      # file that ships with a known database password, because the fallback is
+      # invisible when it works.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: cgzsa
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Deliberately not published to the host: PostgreSQL is reachable only from
+    # the application container over the compose network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cgzsa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://cgzsa:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/cgzsa
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      # Required by the maintenance endpoint, which refuses to run without it in
+      # production. It was absent here, so the documented deployment produced a
+      # site whose scheduled publishing and data retention never ran.
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in .env}
+      # The seed refuses to run in production without this, and it was not
+      # passed through, so the documented "docker compose exec app npm run
+      # db:seed" step could not succeed.
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      # How many reverse proxies sit in front of this container. Used to read the
+      # client's address from the trusted end of X-Forwarded-For. 0 when nothing
+      # is in front of it, as in this compose file.
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-0}
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-stub}
+      ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-}
+      STORAGE_PATH: /app/storage
+    volumes:
+      - storage:/app/storage
+    ports:
+      # Bound to the loopback interface, not 0.0.0.0. A bare "3000:3000"
+      # publishes the app on every interface, so anyone can reach it on
+      # http://your-server:3000 — bypassing the reverse proxy, and with it TLS,
+      # the security headers the proxy may add, and any rate limiting there.
+      # The reverse proxy on the host connects to 127.0.0.1:3000.
+      #
+      # If you run the proxy in Docker too, delete this block entirely and put
+      # both services on the same compose network instead.
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      # Checks the database too, so an application that is running but cannot
+      # serve is restarted rather than left in place.
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Nightly backup of the database and the uploaded files.
+  #
+  # The audit found backups existed only as advice in the README. This runs
+  # scripts/backup.sh once a day inside a container that can reach both the
+  # database and the storage volume.
+  #
+  # BACKUP_REMOTE is what makes it a backup rather than a second copy on the
+  # same disk. Set it to an rclone destination and mount your rclone config:
+  #   BACKUP_REMOTE=b2:cgzsa-backups
+  backup:
+    image: postgres:16-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://cgzsa:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/cgzsa
+      STORAGE_PATH: /storage
+      BACKUP_DIR: /backups
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      BACKUP_REMOTE: ${BACKUP_REMOTE:-}
+    volumes:
+      - storage:/storage:ro
+      - backups:/backups
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "apk add --no-cache bash rclone rsync >/dev/null &&
+       while true; do
+         bash /scripts/backup.sh || echo '[backup] FAILED';
+         sleep 86400;
+       done"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  storage:
+  backups:

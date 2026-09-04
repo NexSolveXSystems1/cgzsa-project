@@ -1,0 +1,86 @@
+name: CI
+
+# Nothing prevented a regression reaching the default branch: the tests existed
+# but ran only when somebody remembered. Every push and pull request now runs
+# the type checker, the unit suite and the full browser suite against a real
+# PostgreSQL, which is the configuration the application actually ships in.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cgzsa
+          POSTGRES_PASSWORD: cgzsa
+          POSTGRES_DB: cgzsa
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cgzsa"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://cgzsa:cgzsa@localhost:5432/cgzsa
+      APP_URL: http://localhost:3000
+      SEED_ADMIN_PASSWORD: CiTestPassword2026!
+      E2E_PASSWORD: CiTestPassword2026!
+      CRON_SECRET: ci-cron-secret
+      TRUSTED_PROXY_COUNT: "0"
+      STORAGE_PATH: ./storage
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # tsc also covers unused locals, unused parameters, switch fallthrough and
+      # missing override, which is most of what a linter would add here.
+      - name: Type check
+        run: npm run typecheck
+
+      # oxlint rather than ESLint: typescript-eslint does not support
+      # TypeScript 7, which this project uses, so there is no TS-aware ESLint
+      # for this toolchain. oxlint parses TypeScript natively.
+      #
+      # Worth being straight about what this does and does not buy. It catches
+      # unused code and a handful of correctness rules. It would NOT have caught
+      # the audit's session-revocation bug — `ne(sessions.id, "")` is a function
+      # call whose arguments happen to be wrong, which no linter can see. That
+      # class of defect is caught by tests, and there is now one for it.
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Migrate and seed
+        run: |
+          npm run db:migrate
+          npm run db:seed
+
+      - name: Build
+        run: npm run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: |
+          npm start &
+          npx wait-on http://localhost:3000/api/health --timeout 60000
+          python3 tests/e2e/run.py

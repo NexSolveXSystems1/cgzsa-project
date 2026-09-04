@@ -1,0 +1,38 @@
+# The build stage runs COPY . . — without this file that includes any .env the
+# developer has created, every previously uploaded file in storage/, and a
+# host-built .next and node_modules. Secrets baked into an image layer survive
+# any later attempt to remove them, and anyone who can pull the image can read
+# them.
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Uploaded files — these belong on a mounted volume, not in the image
+storage/
+
+# Build output and dependencies: rebuilt inside the image
+.next/
+out/
+build/
+node_modules/
+tsconfig.tsbuildinfo
+
+# Source control and local tooling
+.git/
+.gitignore
+.github/
+
+# Tests and their fixtures are not needed at runtime
+tests/
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+*.log
+npm-debug.log*
+
+# Documentation
+README.md

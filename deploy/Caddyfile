@@ -1,0 +1,91 @@
+# Caddy reverse proxy for the CGZSA website.
+#
+# Caddy is recommended over nginx here because it obtains and renews the TLS
+# certificate by itself, with no certbot cron job to forget about. The
+# certificate is the piece most likely to expire quietly and take the site down
+# on a Sunday.
+#
+# Install:
+#   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+#   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+#     | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+#   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+#     | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+#   sudo apt update && sudo apt install -y caddy
+#
+# Then:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo nano /etc/caddy/Caddyfile        # replace cgzsa.org with your domain
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# DNS must already point at this server before the first reload, or the
+# certificate request will fail.
+
+# Redirect the bare domain's www form, so the site has one canonical address.
+# The canonical tags the application emits use APP_URL — keep the two in step.
+www.cgzsa.org {
+	redir https://cgzsa.org{uri} permanent
+}
+
+cgzsa.org {
+	# ── TLS ──────────────────────────────────────────────────────────────────
+	# Automatic. Caddy provisions from Let's Encrypt on first request and renews
+	# in the background. Put a real address here so you are told before expiry
+	# ever becomes a problem.
+	tls admin@cgzsa.org
+
+	# ── Logging ──────────────────────────────────────────────────────────────
+	log {
+		output file /var/log/caddy/cgzsa.log {
+			roll_size 20mb
+			roll_keep 10
+		}
+		format json
+	}
+
+	# ── Compression ──────────────────────────────────────────────────────────
+	# Matters more than usual here: the audience is on mobile connections where
+	# every kilobyte is paid for.
+	encode zstd gzip
+
+	# ── Security headers ─────────────────────────────────────────────────────
+	# The application already sets these on its own responses. They are repeated
+	# here so that anything the proxy serves directly — an error page, a
+	# redirect — carries them too.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+
+	# ── The application ──────────────────────────────────────────────────────
+	reverse_proxy 127.0.0.1:3000 {
+		# Caddy sets X-Forwarded-For by appending the real client address, which
+		# is exactly what the application expects with TRUSTED_PROXY_COUNT=1.
+		header_up X-Real-IP {remote_host}
+
+		# Server-sent events power live chat. Buffering would hold a staff reply
+		# until the buffer filled, which for a chat message is never.
+		flush_interval -1
+
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+	}
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# If you put Cloudflare (or any CDN) in front of this server, two things change:
+#
+#   1. Set TRUSTED_PROXY_COUNT=2 in .env — there are now two proxies appending
+#      to X-Forwarded-For, and the app must look one further left to find the
+#      real client. Better still, set CLIENT_IP_HEADER=cf-connecting-ip, which
+#      Cloudflare sets and clients cannot forge.
+#
+#   2. Restrict this server to Cloudflare's address ranges in the firewall, or
+#      anyone who learns the origin IP can bypass the CDN entirely.
+# ─────────────────────────────────────────────────────────────────────────────
