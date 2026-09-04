@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+export const dynamic = 'force-dynamic';
+
 async function getLogoUrl(): Promise<string> {
   try {
     const s = await getSiteSettings();
