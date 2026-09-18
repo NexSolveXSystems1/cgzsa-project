@@ -27,11 +27,33 @@ const STOP = new Set([
   "should","must","may","might","please","tell","know","there's","here","out","up","down",
 ]);
 
+function normalizedWords(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => (word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word));
+}
+
 function guardTripped(question: string, neverDiscuss: string[]) {
   const q = question.toLowerCase();
+  const qWords = new Set(normalizedWords(question));
   return neverDiscuss.some((topic) => {
-    const words = topic.toLowerCase().split(/\s+/).filter((w) => w.length > 4);
-    return words.length > 0 && words.every((w) => q.includes(w));
+    const words = normalizedWords(topic).filter((w) => w.length > 4 && !STOP.has(w));
+    const topicWords = new Set(words);
+
+    if (topicWords.has("donor") && topicWords.has("amount")) {
+      const asksAboutDonors = qWords.has("donor");
+      const asksAboutMoney =
+        q.includes("how much") ||
+        ["amount", "money", "give", "gave", "given", "donated", "donation", "contribution", "largest", "biggest"].some((word) =>
+          qWords.has(word),
+        );
+      return asksAboutDonors && asksAboutMoney;
+    }
+
+    return words.length > 0 && words.every((w) => qWords.has(w) || q.includes(w));
   });
 }
 
@@ -158,9 +180,7 @@ export async function ask(question: string, cfg: AssistantConfig): Promise<Assis
   if (!cfg.enabled) return handover(cfg.handoverMessage);
 
   if (guardTripped(question, cfg.neverDiscuss)) {
-    return handover(
-      "That is not something I can speak about. I can pass this to the team and they will reply to you directly.",
-    );
+    return handover(cfg.handoverMessage);
   }
 
   const qLower = question.trim().toLowerCase();

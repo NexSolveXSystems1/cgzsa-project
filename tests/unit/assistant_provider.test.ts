@@ -56,4 +56,16 @@ describe("Assistant free & OpenAI-compatible provider integration", () => {
     delete process.env.ASSISTANT_PROVIDER;
     delete process.env.ASSISTANT_API_KEY;
   });
+
+  it("hands over private donor amount questions instead of answering", async () => {
+    const res = await ask("How much did your largest donor give last year?", {
+      ...baseConfig,
+      neverDiscuss: ["Individual donor amounts", "Staff personal details", "Ongoing legal matters"],
+      handoverMessage: "I could not find that in our published information, so I do not want to guess. I can pass this to the team.",
+    });
+
+    expect(res.handover).toBe(true);
+    expect(res.body).toContain("do not want to guess");
+    expect(res.sources).toEqual([]);
+  });
 });
