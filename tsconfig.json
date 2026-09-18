@@ -32,17 +32,48 @@
       }
     ],
     "paths": {
+      "@/app/*": [
+        "./cgzsa-frontend/src/app/*"
+      ],
+      "@/components/*": [
+        "./cgzsa-frontend/src/components/*"
+      ],
+      "@/actions/*": [
+        "./cgzsa-backend/src/actions/*"
+      ],
+      "@/api/*": [
+        "./cgzsa-backend/src/api/*"
+      ],
+      "@/db": [
+        "./cgzsa-backend/src/db/index.ts"
+      ],
+      "@/db/*": [
+        "./cgzsa-backend/src/db/*"
+      ],
+      "@/lib/*": [
+        "./cgzsa-backend/src/lib/*"
+      ],
       "@/*": [
-        "./src/*"
+        "./cgzsa-frontend/src/*",
+        "./cgzsa-backend/src/*"
       ]
     }
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    "cgzsa-frontend/next-env.d.ts",
+    "cgzsa-frontend/**/*.ts",
+    "cgzsa-frontend/**/*.tsx",
+    "cgzsa-backend/**/*.ts",
+    "cgzsa-backend/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "scripts/**/*.ts",
+    "scripts/**/*.tsx",
+    "*.ts",
+    "*.tsx",
+    "cgzsa-frontend/.next/types/**/*.ts",
+    "cgzsa-frontend/.next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -20,8 +20,10 @@ import path from "node:path";
  * do the enforcing pull in the database client and Next.js request context.
  */
 
-const SRC = path.join(import.meta.dirname, "..", "..", "src");
-const SEED = path.join(SRC, "db", "seed.ts");
+const ROOT = path.join(import.meta.dirname, "..", "..");
+const FRONTEND_SRC = path.join(ROOT, "cgzsa-frontend", "src");
+const BACKEND_SRC = path.join(ROOT, "cgzsa-backend", "src");
+const SEED = path.join(BACKEND_SRC, "db", "seed.ts");
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -44,7 +46,7 @@ describe("the permission matrix is honest", () => {
   const permissions = declaredPermissions();
 
   // Everything except the seed itself, which only declares them.
-  const files = sourceFiles(SRC).filter((f) => f !== SEED);
+  const files = [FRONTEND_SRC, BACKEND_SRC].flatMap((dir) => sourceFiles(dir)).filter((f) => f !== SEED);
   const corpus = files.map((f) => readFileSync(f, "utf8")).join("\n");
 
   it("declares the permissions the README describes", () => {
@@ -63,7 +65,7 @@ describe("the permission matrix is honest", () => {
     // The matrix on the users screen lists every permission by definition, so a
     // key that appears ONLY there is one nothing enforces — which is exactly the
     // shape of the two defects the audit found.
-    const usersScreen = path.join(SRC, "app", "admin", "users", "page.tsx");
+    const usersScreen = path.join(FRONTEND_SRC, "app", "admin", "users", "page.tsx");
     const elsewhere = files
       .filter((f) => f !== usersScreen)
       .map((f) => readFileSync(f, "utf8"))

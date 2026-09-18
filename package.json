@@ -2,19 +2,22 @@
   "name": "cgzsa-web",
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/db/seed.ts",
-    "db:index": "tsx src/db/reindex.ts",
+    "dev": "next dev cgzsa-frontend",
+    "build": "next build cgzsa-frontend",
+    "start": "node cgzsa-backend/scripts/server.mjs start",
+    "db:generate": "drizzle-kit generate --config cgzsa-backend/drizzle.config.ts",
+    "db:push": "drizzle-kit push --config cgzsa-backend/drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config cgzsa-backend/drizzle.config.ts",
+    "db:seed": "tsx cgzsa-backend/src/db/seed.ts",
+    "db:index": "tsx cgzsa-backend/src/db/reindex.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "python3 tests/e2e/run.py",
     "lint": "oxlint",
     "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "engines": {
+    "node": "22.x"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
@@ -36,6 +39,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "drizzle-kit": "^0.31.10",
+    "nodemon": "^3.1.14",
     "oxlint": "^1.80.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",

@@ -1,0 +1,14 @@
+{
+  "name": "cgzsa-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "set \"NODE_OPTIONS=\" && node scripts/server.mjs dev",
+    "start": "set \"NODE_OPTIONS=\" && node scripts/server.mjs start",
+    "db:check": "set \"NODE_OPTIONS=\" && node scripts/check-db.mjs",
+    "db:generate": "set \"NODE_OPTIONS=\" && cd ..&& npm run db:generate",
+    "db:migrate": "set \"NODE_OPTIONS=\" && cd ..&& npm run db:migrate",
+    "db:seed": "set \"NODE_OPTIONS=\" && cd ..&& npm run db:seed",
+    "db:index": "set \"NODE_OPTIONS=\" && cd ..&& npm run db:index"
+  }
+}

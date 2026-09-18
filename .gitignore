@@ -1,12 +1,15 @@
 node_modules/
 .next/
+cgzsa-frontend/.next/
 out/
 build/
 storage/
+.tmp/
 *.log
 .env
 .env.local
 .env*.local
 .DS_Store
 next-env.d.ts
+cgzsa-frontend/next-env.d.ts
 tsconfig.tsbuildinfo

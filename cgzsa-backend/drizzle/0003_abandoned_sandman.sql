@@ -1,0 +1,2 @@
+ALTER TABLE "site_settings" ADD COLUMN "logo_id" text;--> statement-breakpoint
+ALTER TABLE "site_settings" ADD CONSTRAINT "site_settings_logo_id_media_assets_id_fk" FOREIGN KEY ("logo_id") REFERENCES "public"."media_assets"("id") ON DELETE no action ON UPDATE no action;

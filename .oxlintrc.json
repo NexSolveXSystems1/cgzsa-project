@@ -10,10 +10,13 @@
   },
   "ignorePatterns": [
     ".next",
+    "cgzsa-frontend/.next",
     "node_modules",
-    "drizzle",
+    ".tmp",
+    ".tmp/**",
+    "cgzsa-backend/drizzle",
     "storage",
-    "public",
+    "cgzsa-frontend/public",
     "*.config.*"
   ],
   "rules": {
@@ -54,8 +57,9 @@
   "overrides": [
     {
       "files": [
-        "src/db/seed.ts",
-        "src/db/reindex.ts",
+        "cgzsa-backend/src/db/seed.ts",
+        "cgzsa-backend/src/db/reindex.ts",
+        "cgzsa-backend/scripts/**",
         "scripts/**",
         "tests/**"
       ],

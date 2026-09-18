@@ -15,7 +15,10 @@ from playwright.sync_api import sync_playwright, expect
 
 BASE = os.environ.get("E2E_BASE", "http://localhost:3000")
 ADMIN_EMAIL = os.environ.get("E2E_EMAIL", "n.clark@cgzsa.org")
-ADMIN_PW = os.environ.get("E2E_PASSWORD", "ChangeThisPassword2026")
+ADMIN_PW = os.environ.get("E2E_PASSWORD") or os.environ.get("SEED_ADMIN_PASSWORD")
+if not ADMIN_PW:
+    print("Set E2E_PASSWORD to the admin password for the test database.", file=sys.stderr)
+    sys.exit(2)
 
 passed, failed = [], []
 
@@ -63,7 +66,7 @@ def main():
         page.on("pageerror", lambda e: errors.append(str(e)))
 
         for path, needle in [
-            ("/", "Turning grassroots action"),
+            ("/", "Clean and Green Zero Sphere Alliance"),
             ("/about", "Who We Are"),
             ("/about/mission-vision-values", "Twelve values"),
             ("/about/leadership", "Leadership"),

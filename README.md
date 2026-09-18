@@ -28,18 +28,19 @@ dashboard they publish from. Replies reach the visitor over server-sent events.
 
 ## Getting started
 
-Requirements: **Node 20 or later** and **PostgreSQL 16 or later**.
+Requirements: **Node 22 LTS** and **PostgreSQL 16 or later**.
 
 ```bash
 cp .env.example .env          # then fill in DATABASE_URL
 npm install
-npm run db:migrate            # create the 44 tables
+npm run db:migrate            # create the 40 tables
 npm run db:seed               # roles, permissions, users and CGZSA's content
 npm run dev                   # http://localhost:3000
 ```
 
-The seed prints the sign-in details for the administrator account. **Change that
-password immediately.**
+For local development, the seed prints a temporary administrator password if
+`SEED_ADMIN_PASSWORD` is not set. In production, set `SEED_ADMIN_PASSWORD`
+yourself, use it once, then **change that password immediately**.
 
 ### The commands
 
@@ -55,30 +56,56 @@ password immediately.**
 
 ---
 
+## Deployment
+
+For the GitHub + Netlify + Railway path, see
+[`deploy/RAILWAY_NETLIFY.md`](deploy/RAILWAY_NETLIFY.md).
+
+The short version: deploy the Next.js app to Netlify, use Railway PostgreSQL for
+the database, and use Railway's public database URL from Netlify because Netlify
+is outside Railway's private network. The `cgzsa-backend/src/db` and
+`cgzsa-backend/drizzle` folders hold the schema, seed and migrations.
+
+---
+
 ## How it is put together
 
 ```
-src/
-  app/
-    (public)/        the public website
-    admin/           the content management system
-    api/chat/        message, escalate, and the SSE stream
-    api/contact/     the contact form endpoint
-  components/
-    public/          header, footer, chat widget, forms
-    admin/           shell, sign-in, reply box
-  db/
-    schema.ts        44 tables — the single source of truth
-    content.ts       CGZSA's own content, taken from the source documents
-    seed.ts          idempotent seeding
-  lib/
-    auth.ts          Argon2id, database sessions, permission checks
-    audit.ts         the append-only log
-    knowledge.ts     indexing and retrieval over published content
-    assistant.ts     the assistant, and its refusal to invent
-    chat-bus.ts      delivery of a staff reply to a waiting visitor
-    ratelimit.ts     per-address limits
-drizzle/             generated SQL migrations
+cgzsa-frontend/
+  src/
+    app/
+      (public)/      the public website
+      admin/         the content management system
+      api/           thin Next route entrypoints into backend handlers
+      rss.xml/       thin Next route entrypoint into the backend RSS handler
+    components/
+      public/        header, footer, chat widget, forms
+      admin/         shell, sign-in, reply box
+    proxy.ts        security headers and public redirects
+  public/            static public assets
+  next.config.ts     Next.js frontend configuration
+
+cgzsa-backend/
+  src/
+    actions/
+      admin/         server-action implementations for the CMS
+    api/
+      chat/          message, escalate, and the SSE stream
+      contact/       the contact form handler
+      cron/          scheduled maintenance
+    db/
+      schema.ts      40 tables - the single source of truth
+      content.ts     CGZSA's own content, taken from the source documents
+      seed.ts        idempotent seeding
+    lib/
+      auth.ts        Argon2id, database sessions, permission checks
+      audit.ts       the append-only log
+      knowledge.ts   indexing and retrieval over published content
+      assistant.ts   the assistant, and its refusal to invent
+      chat-bus.ts    delivery of a staff reply to a waiting visitor
+      ratelimit.ts   per-address limits
+  drizzle/           generated SQL migrations
+  scripts/           backend command-line helpers
 ```
 
 ### Two decisions worth knowing about
@@ -95,7 +122,7 @@ connection closes when the function reaches its maximum duration, and a
 reconnecting client is not guaranteed to reach the same instance. The visitor's
 browser opens an `EventSource` and posts its own messages over ordinary HTTP;
 `EventSource` reconnects by itself, which matters more on a Liberian mobile
-connection than on fibre. See `src/lib/chat-bus.ts` — swap the in-process
+connection than on fibre. See `cgzsa-backend/src/lib/chat-bus.ts` — swap the in-process
 emitter for PostgreSQL `LISTEN`/`NOTIFY` when running more than one instance.
 
 ---
@@ -103,18 +130,22 @@ emitter for PostgreSQL `LISTEN`/`NOTIFY` when running more than one instance.
 ## The assistant
 
 It reads your website and nothing else. That restriction is enforced in
-`src/lib/assistant.ts`, not left to a prompt: the retrieved passages are the only
+`cgzsa-backend/src/lib/assistant.ts`, not left to a prompt: the retrieved passages are the only
 material an answer may draw on, and if nothing relevant comes back there is no
 answer to give.
 
-Two providers:
+Supported providers:
 
 - **`stub`** (default) — composes an answer out of the retrieved passages
   themselves. No API key, no network call, and it cannot invent anything.
 - **`anthropic`** — sends the retrieved passages to a hosted model as quoted
   data, with an instruction to answer only from them. Set `ASSISTANT_API_KEY`.
-  If the provider fails the system falls back to the extractive answer rather
-  than going silent.
+- **`openai`**, **`groq`** and **`ollama`** use the OpenAI-compatible chat
+  completions path. `groq` and `openai` need `ASSISTANT_API_KEY`; `ollama`
+  expects a local Ollama server unless `ASSISTANT_BASE_URL` says otherwise.
+
+If the provider fails the system falls back to the extractive answer rather
+than going silent.
 
 Behaviour is configured in the database, not in code: confidence threshold,
 maximum replies per conversation, a monthly spending cap, office hours, and the
@@ -123,7 +154,7 @@ subjects it must never discuss. See the `assistant_settings` table.
 Try it from the command line:
 
 ```bash
-npx tsx scripts/ask.ts "Do you install water taps in Paynesville?"
+npx tsx cgzsa-backend/scripts/ask.ts "Do you install water taps in Paynesville?"
 ```
 
 ### What happens when it cannot answer
@@ -257,7 +288,7 @@ a monitor sees the outage even though the public pages keep serving from cache.
 
 ## Where content comes from
 
-Everything organisational in `src/db/content.ts` is taken verbatim from the
+Everything organisational in `cgzsa-backend/src/db/content.ts` is taken verbatim from the
 thirteen documents CGZSA supplied: the bylaws and code of conduct, core values,
 introduction, founding rationale, mission and vision statement, organisational
 structure, brochure, logo, articles of incorporation, notary certificate,
@@ -304,7 +335,7 @@ piece of infrastructure.
   that, because a permission that grants nothing misleads whoever reads the
   matrix.
 - Two-factor authentication — enrolment and verification, RFC 6238, in
-  `src/lib/totp.ts`. Codes cannot be replayed, and removing the second factor
+  `cgzsa-backend/src/lib/totp.ts`. Codes cannot be replayed, and removing the second factor
   requires the current password and a live code. There is no organisation-wide
   policy to *require* it — an earlier draft of this file implied there was.
 - Live chat — the widget, the assistant, the staff queue, transcripts, and the
@@ -313,7 +344,7 @@ piece of infrastructure.
   it missed while the connection was down.
 - Contact and volunteer forms, the message queue, redirects, sitemap, robots,
   RSS, and the audit log.
-- Tests — 72 unit tests (`npm run test`) and 58 end-to-end tests
+- Tests — 101 unit tests (`npm run test`) and 37 end-to-end browser checks
   (`python3 tests/e2e/run.py`) covering sign-in, rate limiting, the editorial
   workflow, version restore, chat handover over SSE, and the audit trail. The
   unit suite includes a regression test for each defect found in the August 2026
@@ -332,7 +363,7 @@ piece of infrastructure.
   registered charity's website. The page explains how to give and leaves the
   integration as a decision.
 - **An email account to send from.** Sending itself is written and working
-  (`src/lib/email.ts`, nodemailer): password-reset links, user invitations and
+  (`cgzsa-backend/src/lib/email.ts`, nodemailer): password-reset links, user invitations and
   form notifications for both the contact and volunteer forms go out as soon as
   `SMTP_URL` is set. Until it is, an invited user cannot receive their link, so
   set a temporary password for them instead — the users screen says so. Until it is, they are logged rather than
@@ -341,8 +372,9 @@ piece of infrastructure.
   mailbox; no code changes.
 - **The assistant's language model.** It ships with the extractive provider,
   which answers only by quoting indexed CGZSA content. Setting
-  `ASSISTANT_PROVIDER=anthropic` and an API key switches it. The restriction to
-  CGZSA's own material is enforced in code either way, not by the prompt.
+  `ASSISTANT_PROVIDER` to `anthropic`, `openai`, `groq` or `ollama` switches it
+  to a hosted or local model where configured. The restriction to CGZSA's own
+  material is enforced in code either way, not by the prompt.
 - **Other languages.** The site is English only. Nothing in the schema or the
   routing is multilingual yet, so this is a real piece of work rather than a
   switch — worth scoping separately if CGZSA wants French or a local language.
@@ -350,9 +382,9 @@ piece of infrastructure.
 **Known limitations**
 
 - `script-src` allows `'unsafe-inline'`. The reasoning is written out in full at
-  the top of `src/middleware.ts`; it is a trade against static generation, and
+  the top of `cgzsa-frontend/src/proxy.ts`; it is a trade against static generation, and
   reversing it is a one-line change plus dynamic rendering. Because there is no
-  second line of defence if the sanitiser is wrong, `src/lib/sanitise.ts` escapes
+  second line of defence if the sanitiser is wrong, `cgzsa-backend/src/lib/sanitise.ts` escapes
   every `<` that is not a complete allow-listed tag, and the unit suite runs a
   corpus of bypass payloads against it.
 - The rate limiter and the chat message bus hold state in process memory. They

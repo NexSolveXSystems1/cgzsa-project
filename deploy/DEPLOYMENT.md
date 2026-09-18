@@ -175,7 +175,8 @@ docker compose exec app npm run db:migrate    # 40 tables
 docker compose exec app npm run db:seed       # roles, permissions, users, content
 ```
 
-The seed prints the administrator's sign-in details. Check it is alive:
+Use the administrator email and the `SEED_ADMIN_PASSWORD` you generated. Check it
+is alive:
 
 ```bash
 curl -s http://127.0.0.1:3000/api/health
@@ -321,7 +322,7 @@ Open `https://cgzsa.org/admin` and sign in with the seeded administrator.
 Then, immediately:
 
 1. **Change the administrator password** on the account screen. The seeded one
-   was printed to a terminal and may be in your scrollback.
+   was shared through deployment configuration and should be treated as exposed.
 2. **Turn on two-factor authentication** for the administrator account.
 3. **Set real passwords** for the other seeded accounts, or suspend the ones you
    are not using. They exist with the same seeded password.
@@ -406,7 +407,7 @@ Worth knowing before they surprise you:
   staff chat reply reaches only the visitors connected to the same container.
   Moving both to PostgreSQL `LISTEN`/`NOTIFY` is the fix when you need to scale.
 - **`script-src` allows `'unsafe-inline'`**, a deliberate trade for static
-  generation, reasoned out at the top of `src/middleware.ts`.
+  generation, reasoned out at the top of `cgzsa-frontend/src/proxy.ts`.
 - **Uploads live on a Docker volume**, not object storage. It is backed up by
   `scripts/backup.sh`; there is no S3 driver.
 - **English only.** Nothing in the schema or routing is multilingual.

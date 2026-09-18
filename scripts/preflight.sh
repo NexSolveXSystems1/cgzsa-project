@@ -34,7 +34,7 @@ head_ "Secrets and configuration"
 weak_or_unset() {   # name value  → 0 if unset/weak
   local v="${2:-}"
   [ -z "$v" ] && return 0
-  case "$v" in change-me|changeme|password|secret|test|ChangeThisPassword2026) return 0 ;; esac
+  case "$v" in change-me|changeme|password|secret|test|ChangeThisPassword*) return 0 ;; esac
   [ "${#v}" -lt 16 ] && return 0
   return 1
 }
@@ -116,7 +116,7 @@ else bad "/admin/users returned $got" "Anonymous users must not reach admin scre
 head_ "Security headers"
 HDRS="$(curl -sI --max-time 15 "$BASE/" 2>/dev/null)"
 for h in content-security-policy x-frame-options x-content-type-options referrer-policy permissions-policy; do
-  echo "$HDRS" | grep -qi "^$h:" && ok "$h present" || bad "$h missing" "Check next.config.ts and the proxy configuration."
+  echo "$HDRS" | grep -qi "^$h:" && ok "$h present" || bad "$h missing" "Check cgzsa-frontend/next.config.ts and the proxy configuration."
 done
 
 if [ "${BASE#https://}" != "$BASE" ]; then
